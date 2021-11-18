@@ -4,11 +4,14 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 )
 
 type Teardown struct {
-	ch  chan os.Signal
+	ch chan os.Signal
+
+	mu  sync.Mutex
 	fns []func()
 }
 
@@ -16,19 +19,24 @@ func NewTeardown() *Teardown {
 	t := &Teardown{
 		ch: make(chan os.Signal),
 	}
+
 	signal.Notify(t.ch, syscall.SIGTERM, syscall.SIGINT)
 
 	go func() {
-		<-t.ch
-		log.Print("SIGTERM received. Shutdown process initiated\n")
-		for _, fn := range t.fns {
-			fn()
-		}
+		sig := <-t.ch
+		log.Printf("Received %d %s. Shutting process down...\n", sig, sig)
+		t.mu.Lock()
+		defer t.mu.Unlock()
+		for i := len(t.fns) - 1; i >= 0; i-- {
+            t.fns[i]()
+        }
 	}()
 
 	return t
 }
 
 func (t *Teardown) AddFn(fn func()) {
+	t.mu.Lock()
 	t.fns = append(t.fns, fn)
+	t.mu.Unlock()
 }
