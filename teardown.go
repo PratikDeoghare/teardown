@@ -27,9 +27,9 @@ func NewTeardown() *Teardown {
 		log.Printf("Received %d %s. Shutting process down...\n", sig, sig)
 		t.mu.Lock()
 		defer t.mu.Unlock()
-		for i := len(t.fns) - 1; i >= 0; i-- {
-            t.fns[i]()
-        }
+		for _, f := range t.fns {
+			f()
+		}
 	}()
 
 	return t
